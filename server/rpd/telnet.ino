@@ -1,5 +1,11 @@
 #include <ESPTelnet.h>
 
+struct TDataHeader
+{
+  uint32_t sig;
+  
+};
+
 ESPTelnet telnet;
 
 SemaphoreHandle_t xSendSemaphore;
@@ -8,16 +14,15 @@ void TelnetSendTask(void *pvParameter)
 {
   for(;;)
   {
-    //fprintf(stdout, "HIT.1\n");
     int sz = LZ_Compress((unsigned char *)packed_buffer, compressed_buffer, ((SAMPLE_RATE * 12) / 16) * sizeof(unsigned short));
-    //int sz = ((SAMPLE_RATE * 12) / 16) * sizeof(unsigned short);
-    //memcpy(compressed_buffer, packed_buffer, sz);
-    //fprintf(stdout, "HIT.2\n");
-    
+
     sb64buffer = base64::encode(compressed_buffer, sz);
-    //sb64buffer = base64::encode((uint8_t*)packed_buffer, ((SAMPLE_RATE * 12) / 16) * sizeof(unsigned short));
 
     xSemaphoreTake(xSendSemaphore, portMAX_DELAY);
+
+    char sSize[5];
+    sprintf(sSize, "%04x", sb64buffer.length());
+    telnet.print(sSize);
     telnet.print(sb64buffer);
   } // for(;;)
 }
@@ -29,8 +34,8 @@ void TelnetTask(void *pvParameter)
     Serial.print("- Telnet: ");
     Serial.print(ip);
     Serial.println(" connected");
-    telnet.println("\nWelcome " + telnet.getIP());
-    telnet.println("(Use ^] + q  to disconnect.)");
+    //telnet.println("\nWelcome " + telnet.getIP());
+    //telnet.println("(Use ^] + q  to disconnect.)");
   });
   telnet.onConnectionAttempt([](String ip) {
     Serial.print("- Telnet: ");
