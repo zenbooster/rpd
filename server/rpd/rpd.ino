@@ -39,7 +39,7 @@
 
 //const byte DNS_PORT = 53;
 
-#define SAMPLE_RATE 2048 // для опроса ЭМГ сенсора
+#define SAMPLE_RATE 2001 // для опроса ЭМГ сенсора. Должно делиться на 3 без остатка, т.к. 3 байта у нас кодируют 2 значения.
 
 static esp_adc_cal_characteristics_t *adc_chars;
 static const adc_atten_t atten = ADC_ATTEN_DB_11;
