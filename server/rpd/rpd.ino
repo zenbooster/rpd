@@ -236,19 +236,8 @@ void setup()
   print_char_val_type(val_type);
 
   dbuf.onFillingComplete([](unsigned short *pbuf) {
-    /*for(int i = 0; i < SAMPLE_RATE; i++)
-    {
-      packer.push(*pbuf++);
-      //*packed_buffer_ptr++ = *pbuf++;
-    }
-    packed_buffer_ptr = packed_buffer;
-    */
-
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     xSemaphoreGiveFromISR(xSendSemaphore, &xHigherPriorityTaskWoken);
-    //if( xHigherPriorityTaskWoken == pdTRUE) {
-    //  taskYIELD();
-    //}
   });
 
   packer.onProduce([](unsigned short v) {
@@ -261,9 +250,4 @@ void setup()
 void loop()
 {
   webServer.handleClient();
-  //telnet.loop();
-
-  //int val = adc1_get_raw(channel);
-  //Serial.print("Read ADC pin [" + String(pin) + "]: " + String(val) + "\r\n");
-  //packer.push(val);
 }

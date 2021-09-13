@@ -84,7 +84,7 @@ def decompress(src):
      
                     # Copy corresponding data from history window
                     for i in range(length):
-                        out += out[-offset:1]
+                        out += out[-offset:-offset+1]
             else:
                 # No marker, plain copy
                 out += bytes([symbol])
@@ -138,7 +138,7 @@ with open("data.bin", "wb") as f:
             data = sock_read(sock, sz)
             d = base64.b64decode(data)
             sz = len(d)
-            #d = decompress(d)
+            d = decompress(d)
 
             state = 0
             v16 = 0

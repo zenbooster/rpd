@@ -25,10 +25,10 @@ void TelnetSendTask(void *pvParameter)
     packed_buffer_ptr = packed_buffer;
 
     
-    //int sz = LZ_Compress((unsigned char *)packed_buffer, compressed_buffer, ((SAMPLE_RATE * 12) / 16) * sizeof(unsigned short));
+    int sz = LZ_Compress((unsigned char *)packed_buffer, compressed_buffer, ((SAMPLE_RATE * 12) / 16) * sizeof(unsigned short));
 
-    int sz = ((SAMPLE_RATE * 12) / 16) * sizeof(unsigned short);
-    memcpy(compressed_buffer, (unsigned char *)packed_buffer, sz);
+    //int sz = ((SAMPLE_RATE * 12) / 16) * sizeof(unsigned short);
+    //memcpy(compressed_buffer, (unsigned char *)packed_buffer, sz);
     sb64buffer = base64::encode(compressed_buffer, sz);
 
     char sSize[5];
