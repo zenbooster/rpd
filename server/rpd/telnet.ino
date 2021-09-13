@@ -1,10 +1,22 @@
 #include <ESPTelnet.h>
 
-struct TDataHeader
+enum ECompressMethod
 {
-  uint32_t sig;
-  
+  ECM_NONE = 0,
+  ECM_LZ77
 };
+
+#pragma pack(push, 1)
+typedef struct
+{
+  unsigned long sig;
+  unsigned long utc_time;
+  unsigned short ver;
+  unsigned char compress_method;
+  unsigned char bits_per_sample;
+  unsigned long sample_rate; 
+} TDataHeader;
+#pragma pack(pop)
 
 ESPTelnet telnet;
 
@@ -45,8 +57,31 @@ void TelnetTask(void *pvParameter)
     Serial.print("- Telnet: ");
     Serial.print(ip);
     Serial.println(" connected");
-    //telnet.println("\nWelcome " + telnet.getIP());
-    //telnet.println("(Use ^] + q  to disconnect.)");
+
+    //
+    while(!timeClient.update()) {
+      timeClient.forceUpdate();
+    }
+    // The formattedDate comes with the following format:
+    // 2018-05-28T16:00:13Z
+    // We need to extract date and time
+    epoch_time = timeClient.getEpochTime();
+    fprintf(stdout, "UTC = %s", timeClient.getFormattedTime());
+    //
+  
+    TDataHeader hdr = {
+      '\0DPR',
+      epoch_time,
+      0x0001,
+      (uint8_t)ECM_LZ77,
+      12,
+      SAMPLE_RATE
+    };
+    String sb64hdr = base64::encode((unsigned char*)&hdr, sizeof(hdr));
+    char sSize[5];
+    sprintf(sSize, "%04x", sb64hdr.length());
+    telnet.print(sSize);
+    telnet.print(sb64hdr);
   });
   telnet.onConnectionAttempt([](String ip) {
     Serial.print("- Telnet: ");

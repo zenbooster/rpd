@@ -2,8 +2,16 @@ import socket
 import sys
 import select
 import base64
+from struct import *
+from datetime import datetime
+from enum import IntEnum, auto, unique
 
 buffer = bytes()
+
+@unique
+class ECompressMethod(IntEnum):
+    ECM_NONE = 0
+    ECM_LZ77 = auto()
 
 class Unpack12bit:
     def __init__(self):
@@ -112,15 +120,75 @@ def unp_on_produce(v):
     global buffer
     buffer += bytes([v & 0xff, v >> 8])
 
+def recv_header():
+    global recv_func
+
+    data = sock_read(s, 4)
+    sz = int(data, 0x10)
+
+    hdr = sock_read(s, sz)
+    d = base64.b64decode(hdr)
+    sz = len(d)
+
+    f.write(d)
+    sig, utc_time, ver, compress_method, bits_per_sample, sample_rate = unpack('<LLHBBL', d)
+    if sig != 0x445052:
+        print("Invalid header signature!")
+        s.close()
+    else:
+        print("Header signature is ok.")
+        print("Header version is {}.{}.".format(ver >> 8, ver & 0xff))
+        
+        ecm = ECompressMethod(compress_method)
+        ecm_max = len(ECompressMethod) - 1
+        print("Compress method is {}.".format((compress_method > ecm_max) and "unsupported ({})".format(compress_method) or ecm.name[4:]))
+        if compress_method > ecm_max:
+            s.close()
+        else:
+            print("Bits per sample is {}.".format(bits_per_sample))
+            print("Sample rate is {}.".format(sample_rate))
+                
+            print("Stream started at {} (UTC)".format(datetime.utcfromtimestamp(utc_time).strftime('%Y-%m-%d %H:%M:%S')))
+
+            recv_func = recv_block
+
+def recv_block():
+    global buffer
+    #incoming message from remote server
+    data = sock_read(sock, 4)
+    sz = int(data, 0x10)
+    print("block size = {}".format(sz))
+    
+    data = sock_read(sock, sz)
+    d = base64.b64decode(data)
+    sz = len(d)
+    d = decompress(d)
+
+    state = 0
+    v16 = 0
+    for b in d:
+        if state == 0:
+            v16 = b
+        else:
+            v16 = v16 | (b << 8)
+            unp.push(v16)
+        
+        state = (state + 1) & 1
+    
+    f.write(buffer)
+    buffer = bytes()
+
 host = "192.168.1.131"
 port = 23
 unp = Unpack12bit()
 unp.onProduce(unp_on_produce)
+recv_func = recv_header
 
-with open("data.bin", "wb") as f:
+with open("data.rpd", "wb") as f:
     #s = socket.socket(AF_INET, SOCK_STREAM)
     s = socket.socket()
     s.connect((host, port))
+    print("Connected to RPD server!")
 
     data = bytes()
     while True:
@@ -130,30 +198,6 @@ with open("data.bin", "wb") as f:
             socket_list, [], [])
 
         for sock in read_sockets:
-            #incoming message from remote server
-            data = sock_read(sock, 4)
-            sz = int(data, 0x10)
-            print("sz = {}\n".format(sz))
-            
-            data = sock_read(sock, sz)
-            d = base64.b64decode(data)
-            sz = len(d)
-            d = decompress(d)
-
-            state = 0
-            v16 = 0
-            for b in d:
-                if state == 0:
-                    v16 = b
-                else:
-                    v16 = v16 | (b << 8)
-                    unp.push(v16)
-                
-                state = (state + 1) & 1
-            
-            f.write(buffer)
-            buffer = bytes()
-
-            #f.write(d)
+            recv_func()
 
     s.close()

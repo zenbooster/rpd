@@ -6,6 +6,8 @@
 #include <WiFiManager.h>          //https://github.com/tzapu/WiFiManager WiFi Configuration Magic
 //#include <DNSServer.h>
 #include <WebServer.h>
+#include <NTPClient.h>
+#include <WiFiUdp.h>
 #include <base64.h>
 #include "telnet.h"
 #include "pack12bit.h"
@@ -49,6 +51,10 @@ static int counter = 0;
 WiFiManager wifiManager;
 //DNSServer dnsServer;
 WebServer webServer(80);
+
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP);
+unsigned long epoch_time;
 
 DoubleBuffer dbuf(SAMPLE_RATE);
 unsigned short packed_buffer[(SAMPLE_RATE * 12) / 16];
@@ -208,6 +214,9 @@ void setup()
   dnsServer.start(DNS_PORT, "rpd", WiFi.localIP());
   */
 
+  timeClient.begin();
+  timeClient.setTimeOffset(0); // UTC
+  
   webServer.onNotFound([]() {
     webServer.send(200, "text/html", responseHTML);
   });
