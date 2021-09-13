@@ -33,9 +33,6 @@ class Unpack12bit:
 
             break
 
-to_int = lambda x : int.from_bytes(x, "little")
-block_size = 8
-
 def _LZ_ReadVarSize(x, buf):
     # Read complete value (stop when byte contains zero in 8:th bit)
     y = 0
@@ -113,7 +110,7 @@ def sock_read(sock, sz):
 
 def unp_on_produce(v):
     global buffer
-    buffer += bytes([v >> 8, v & 0xff])
+    buffer += bytes([v & 0xff, v >> 8])
 
 host = "192.168.1.131"
 port = 23
@@ -141,19 +138,22 @@ with open("data.bin", "wb") as f:
             data = sock_read(sock, sz)
             d = base64.b64decode(data)
             sz = len(d)
-            d = decompress(d)
+            #d = decompress(d)
+
             state = 0
             v16 = 0
             for b in d:
                 if state == 0:
-                    v16 = b << 8
+                    v16 = b
                 else:
-                    v16 = v16 | b
+                    v16 = v16 | (b << 8)
                     unp.push(v16)
                 
                 state = (state + 1) & 1
             
             f.write(buffer)
             buffer = bytes()
+
+            #f.write(d)
 
     s.close()

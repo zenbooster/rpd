@@ -10,6 +10,7 @@ class DoubleBuffer
     unsigned short *pcur;
     unsigned short *emg_buffer[2];
     unsigned short *pemg_buffer;
+    unsigned short *pemg_buffer_old;
 
     void switch_emg_buffer();
 
@@ -20,6 +21,7 @@ class DoubleBuffer
     ~DoubleBuffer();
 
     void add(unsigned short v);
+    unsigned short *get_pemg_buffer_old() const;
 
     void onFillingComplete(CallbackFunction f);
 };

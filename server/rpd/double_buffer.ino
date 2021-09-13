@@ -1,12 +1,11 @@
 void DoubleBuffer::switch_emg_buffer()
 {
-  unsigned short *pbuf = pemg_buffer;
-
   emg_buffer_sel_idx = (emg_buffer_sel_idx + 1) & 1;
+  pemg_buffer_old = pemg_buffer;
   pemg_buffer = emg_buffer[emg_buffer_sel_idx];
   pcur = pemg_buffer;
 
-  on_filling_complete(pbuf);
+  on_filling_complete(pemg_buffer_old);
 }
 
 DoubleBuffer::DoubleBuffer(int cnt):
@@ -17,6 +16,7 @@ DoubleBuffer::DoubleBuffer(int cnt):
   {
     emg_buffer[i] = new unsigned short[count];
   }
+  pemg_buffer_old = emg_buffer[(emg_buffer_sel_idx + 1) & 1];
   pemg_buffer = emg_buffer[emg_buffer_sel_idx];
   pcur = pemg_buffer;
 }
@@ -37,6 +37,11 @@ void DoubleBuffer::add(unsigned short v)
   {
     switch_emg_buffer();
   }
+}
+
+unsigned short *DoubleBuffer::get_pemg_buffer_old() const
+{
+  return pemg_buffer_old;
 }
 
 void DoubleBuffer::onFillingComplete(CallbackFunction f)

@@ -236,23 +236,19 @@ void setup()
   print_char_val_type(val_type);
 
   dbuf.onFillingComplete([](unsigned short *pbuf) {
-    for(int i = 0; i < SAMPLE_RATE; i++)
+    /*for(int i = 0; i < SAMPLE_RATE; i++)
     {
       packer.push(*pbuf++);
+      //*packed_buffer_ptr++ = *pbuf++;
     }
     packed_buffer_ptr = packed_buffer;
-    /*
-    //fprintf(stdout, "HIT.1\n");
-    //int sz = LZ_Compress((unsigned char *)packed_buffer, compressed_buffer, ((SAMPLE_RATE * 12) / 16) * sizeof(unsigned short));
-    //int sz = ((SAMPLE_RATE * 12) / 16) * sizeof(unsigned short);
-    //memcpy(compressed_buffer, packed_buffer, sz);
-    //fprintf(stdout, "HIT.2\n");
-    
-    //sb64buffer = base64::encode(compressed_buffer, sz);
-    sb64buffer = base64::encode((uint8_t*)packed_buffer, ((SAMPLE_RATE * 12) / 16) * sizeof(unsigned short));
     */
+
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     xSemaphoreGiveFromISR(xSendSemaphore, &xHigherPriorityTaskWoken);
+    //if( xHigherPriorityTaskWoken == pdTRUE) {
+    //  taskYIELD();
+    //}
   });
 
   packer.onProduce([](unsigned short v) {

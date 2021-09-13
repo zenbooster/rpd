@@ -14,11 +14,22 @@ void TelnetSendTask(void *pvParameter)
 {
   for(;;)
   {
-    int sz = LZ_Compress((unsigned char *)packed_buffer, compressed_buffer, ((SAMPLE_RATE * 12) / 16) * sizeof(unsigned short));
-
-    sb64buffer = base64::encode(compressed_buffer, sz);
-
     xSemaphoreTake(xSendSemaphore, portMAX_DELAY);
+
+    unsigned short *p = dbuf.get_pemg_buffer_old();
+    packer.reset();
+    for(int i = 0; i < SAMPLE_RATE; i++)
+    {
+      packer.push(*p++);
+    }
+    packed_buffer_ptr = packed_buffer;
+
+    
+    //int sz = LZ_Compress((unsigned char *)packed_buffer, compressed_buffer, ((SAMPLE_RATE * 12) / 16) * sizeof(unsigned short));
+
+    int sz = ((SAMPLE_RATE * 12) / 16) * sizeof(unsigned short);
+    memcpy(compressed_buffer, (unsigned char *)packed_buffer, sz);
+    sb64buffer = base64::encode(compressed_buffer, sz);
 
     char sSize[5];
     sprintf(sSize, "%04x", sb64buffer.length());
