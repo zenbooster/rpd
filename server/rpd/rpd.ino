@@ -41,7 +41,7 @@
 
 //const byte DNS_PORT = 53;
 
-#define SAMPLE_RATE 3000 // (SAMPLE_RATE * 12) / 16 должно являться целым числом.
+#define SAMPLE_RATE 2000 // (SAMPLE_RATE * 12) / 16 должно являться целым числом.
 #if (SAMPLE_RATE * 12) & 0x0f
 #   error "The data will not fit into the buffer entirely."
 #endif
