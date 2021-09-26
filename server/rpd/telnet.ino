@@ -1,4 +1,4 @@
-#include <ESPTelnet.h>
+#include "ESPTelnetDbg.h"
 
 enum ECompressMethod
 {
@@ -18,7 +18,7 @@ typedef struct
 } TDataHeader;
 #pragma pack(pop)
 
-ESPTelnet telnet;
+ESPTelnetDbg telnet;
 
 SemaphoreHandle_t xSendSemaphore;
 
@@ -27,6 +27,8 @@ void TelnetSendTask(void *pvParameter)
   for(;;)
   {
     xSemaphoreTake(xSendSemaphore, portMAX_DELAY);
+
+    digitalWrite(LED_BUILTIN, HIGH);
 
     unsigned short *p = dbuf.get_pemg_buffer_old();
     packer.reset();
@@ -47,8 +49,18 @@ void TelnetSendTask(void *pvParameter)
     sprintf(sSize, "%04x", sb64buffer.length());
     telnet.print(sSize);
     telnet.print(sb64buffer);
+
+    digitalWrite(LED_BUILTIN, LOW);
   } // for(;;)
 }
+
+/*void onTelnetDisconnect(String ip)
+{
+    timer_pause(TIMER_GROUP_0, TIMER_0);
+    Serial.print("- Telnet: ");
+    Serial.print(ip);
+    Serial.println(" disconnected");
+}*/
 
 void TelnetTask(void *pvParameter)
 {
@@ -66,7 +78,7 @@ void TelnetTask(void *pvParameter)
     // 2018-05-28T16:00:13Z
     // We need to extract date and time
     epoch_time = timeClient.getEpochTime();
-    fprintf(stdout, "UTC = %s", timeClient.getFormattedTime());
+    fprintf(stdout, "UTC = %s\n", timeClient.getFormattedTime());
     //
   
     TDataHeader hdr = {
@@ -82,8 +94,10 @@ void TelnetTask(void *pvParameter)
     sprintf(sSize, "%04x", sb64hdr.length());
     telnet.print(sSize);
     telnet.print(sb64hdr);
+
+    timer_start(TIMER_GROUP_0, TIMER_0);
   });
-  telnet.onConnectionAttempt([](String ip) {
+  /*telnet.onConnectionAttempt([](String ip) {
     Serial.print("- Telnet: ");
     Serial.print(ip);
     Serial.println(" tried to connected");
@@ -92,12 +106,14 @@ void TelnetTask(void *pvParameter)
     Serial.print("- Telnet: ");
     Serial.print(ip);
     Serial.println(" reconnected");
-  });
+  });*/
   telnet.onDisconnect([](String ip) {
+    timer_pause(TIMER_GROUP_0, TIMER_0);
     Serial.print("- Telnet: ");
     Serial.print(ip);
     Serial.println(" disconnected");
   });
+  //telnet.onDisconnect(onTelnetDisconnect);
   
   // passing a lambda function
   telnet.onInputReceived([](String str) {
@@ -118,7 +134,8 @@ void TelnetTask(void *pvParameter)
     for (;;)
     {
       telnet.loop();
-      vTaskDelay(10);
+      //vTaskDelay(10);
+      vTaskDelay(100);
     } // for (;;)
   }
   else

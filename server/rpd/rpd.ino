@@ -41,7 +41,9 @@
 
 //const byte DNS_PORT = 53;
 
-#define SAMPLE_RATE 2001 // для опроса ЭМГ сенсора. Должно делиться на 3 без остатка, т.к. 3 байта у нас кодируют 2 значения.
+#define SAMPLE_RATE 2000
+
+const int LED_BUILTIN = 2;
 
 static esp_adc_cal_characteristics_t *adc_chars;
 static const adc_atten_t atten = ADC_ATTEN_DB_11;
@@ -187,7 +189,7 @@ static void timerInit()
   // Зарегистрировать обработчик прерывания
   timer_isr_register(TIMER_GROUP_0, TIMER_0, timer0_ISR, NULL, ESP_INTR_FLAG_IRAM, NULL);
   // Запустить таймер
-  timer_start(TIMER_GROUP_0, TIMER_0);
+  //timer_start(TIMER_GROUP_0, TIMER_0);
 }
 
 void setup()
@@ -222,6 +224,8 @@ void setup()
   });
   webServer.begin();
 
+  timerInit();
+  pinMode(LED_BUILTIN, OUTPUT);
   setupTelnet();
 
   // инициализация АЦП:
@@ -252,8 +256,6 @@ void setup()
   packer.onProduce([](unsigned short v) {
     *packed_buffer_ptr++ = v;
   });
-
-  timerInit();
 }
 
 void loop()

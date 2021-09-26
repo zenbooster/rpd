@@ -1,6 +1,8 @@
 #pragma once
 
-#include <ESPTelnet.h>
+#include "ESPTelnetDbg.h"
 
-extern ESPTelnet telnet;
+extern ESPTelnetDbg telnet;
 extern SemaphoreHandle_t xSendSemaphore;
+
+bool setupTelnet();
