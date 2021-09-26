@@ -41,7 +41,7 @@
 
 //const byte DNS_PORT = 53;
 
-#define SAMPLE_RATE 2000
+#define SAMPLE_RATE 2000 // (SAMPLE_RATE * 12) / 16 должно являться целым числом.
 
 const int LED_BUILTIN = 2;
 
