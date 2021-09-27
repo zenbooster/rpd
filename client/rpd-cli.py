@@ -1,18 +1,25 @@
 #!/usr/bin/env python3
 import socket
 import sys
+import os
 import select
+import asyncio
 import base64
 from struct import *
 from datetime import datetime
 from enum import IntEnum, auto, unique
 
-buffer = bytes()
+MAX_RPD_FILES_DATA_SIZE = 1024*1024*1024*1 # 1G
 
 @unique
 class ECompressMethod(IntEnum):
     ECM_NONE = 0
     ECM_LZ77 = auto()
+
+@unique
+class EState(IntEnum):
+    ES_WAIT_FOR_SIZE = auto()
+    ES_WAIT_FOR_DATA = auto()
 
 class Unpack12bit:
     def __init__(self):
@@ -102,103 +109,170 @@ def decompress(src):
 
     return out
 
-def sock_read(sock, sz):
-    res = bytes()
-    
-    while sz:
-        data = sock.recv(sz)
-        if not data:
-            print('\nDisconnected from server')
-            res = data
-            break
-        else:
-            res += data
-            sz -= len(data)
-    
-    return res
-
 def unp_on_produce(v):
     global buffer
     buffer += bytes([v & 0xff, v >> 8])
 
-def recv_header():
-    global recv_func
-
-    data = sock_read(s, 4)
-    sz = int(data, 0x10)
-
-    hdr = sock_read(s, sz)
-    d = base64.b64decode(hdr)
-    sz = len(d)
-
-    f.write(d)
-    sig, utc_time, ver, compress_method, bits_per_sample, sample_rate = unpack('<LLHBBL', d)
-    if sig != 0x445052:
-        print("Invalid header signature!")
-        s.close()
-    else:
-        print("Header signature is ok.")
-        print("Header version is {}.{}.".format(ver >> 8, ver & 0xff))
-        
-        ecm = ECompressMethod(compress_method)
-        ecm_max = len(ECompressMethod) - 1
-        print("Compress method is {}.".format((compress_method > ecm_max) and "unsupported ({})".format(compress_method) or ecm.name[4:]))
-        if compress_method > ecm_max:
-            s.close()
-        else:
-            print("Bits per sample is {}.".format(bits_per_sample))
-            print("Sample rate is {}.".format(sample_rate))
-                
-            print("Stream started at {} (UTC)".format(datetime.utcfromtimestamp(utc_time).strftime('%Y-%m-%d %H:%M:%S')))
-
-            recv_func = recv_block
-
-def recv_block():
-    global buffer
-    #incoming message from remote server
-    data = sock_read(sock, 4)
-    sz = int(data, 0x10)
-    print("block size = {}".format(sz))
-    
-    data = sock_read(sock, sz)
-    d = base64.b64decode(data)
-    sz = len(d)
-    d = decompress(d)
-
-    state = 0
-    v16 = 0
-    for b in d:
-        if state == 0:
-            v16 = b
-        else:
-            v16 = v16 | (b << 8)
-            unp.push(v16)
-        
-        state = (state + 1) & 1
-    
-    f.write(buffer)
-    buffer = bytes()
-
 host = "192.168.1.131"
 port = 23
-unp = Unpack12bit()
-unp.onProduce(unp_on_produce)
-recv_func = recv_header
+#unp = Unpack12bit()
+#unp.onProduce(unp_on_produce)
 
-with open("data.rpd", "wb") as f:
-    #s = socket.socket(AF_INET, SOCK_STREAM)
-    s = socket.socket()
-    s.connect((host, port))
-    print("Connected to RPD server!")
+TIMEOUT = 2
 
-    data = bytes()
+class TcpClientProtocol(asyncio.Protocol):
+    def recv_header(self, data):
+        global recv_func
+
+        hdr = data
+        d = base64.b64decode(hdr)
+        sz = len(d)
+
+        fmt = '<LLHBBL'
+        sig, utc_time, ver, compress_method, bits_per_sample, sample_rate = unpack(fmt, d)
+        d = pack(fmt, sig, utc_time, ver, ECompressMethod.ECM_NONE, bits_per_sample, sample_rate)
+
+        self.f.write(d)
+        if sig != 0x445052:
+            print("Invalid header signature!")
+            raise Exception("Invalid header signature!")
+        else:
+            print("Header signature is ok.")
+            print("Header version is {}.{}.".format(ver >> 8, ver & 0xff))
+            
+            ecm = ECompressMethod(compress_method)
+            ecm_max = len(ECompressMethod) - 1
+            msg = "Compress method is {}.".format((compress_method > ecm_max) and "unsupported ({})".format(compress_method) or ecm.name[4:])
+            print(msg)
+            if compress_method > ecm_max:
+                raise Exception(msg)
+            else:
+                print("Bits per sample is {}.".format(bits_per_sample))
+                print("Sample rate is {}.".format(sample_rate))
+
+                utc = datetime.utcfromtimestamp(utc_time).strftime('%Y-%m-%d %H:%M:%S')
+                print("Stream started at {} (UTC)".format(utc))
+                
+                name = utc
+                name = name.replace(' ', '-')
+                name = name.replace(':', '-')
+                name += '.rpd'
+                
+                self.f.close()
+                os.rename(self.fname, name)
+                self.fname = name
+                self.f = open(self.fname, "ab")
+
+                self.recv_func = self.recv_block
+
+    def recv_block(self, data):
+        d = base64.b64decode(data)
+        sz = len(d)
+        d = decompress(d)
+
+        '''
+        state = 0
+        v16 = 0
+        for b in d:
+            if state == 0:
+                v16 = b
+            else:
+                v16 = v16 | (b << 8)
+                unp.push(v16)
+            
+            state = (state + 1) & 1
+        
+        f.write(buffer)
+        '''
+        self.f.write(d)
+
+    def __init__(self, on_con_lost):
+        # это надо бы налету проверять и делать, но пока хоть так...
+        filesizes = sum(os.path.getsize(f) for f in os.listdir() if (os.path.isfile(f) and f.endswith('.rpd')))
+        print("Total .rpd files data size = {}".format(filesizes))
+        if filesizes >= MAX_RPD_FILES_DATA_SIZE:
+            oldest_file = min([os.path.abspath(f) for f in os.listdir() if f.endswith('.rpd')], key=os.path.getctime)
+            print('remove oldest_file: {}'.format(oldest_file))
+            os.remove(oldest_file)
+    
+        self.fname = "data.rpd"
+        self.f = open(self.fname, "wb")
+        self.transport = None
+        self.on_con_lost = on_con_lost
+        
+        self.queue = bytes()
+        self.state = EState.ES_WAIT_FOR_SIZE
+        self.recv_func = self.recv_header
+
+        loop = asyncio.get_running_loop()
+        self.timeout_handle = loop.call_later(TIMEOUT, self._timeout,)
+    
+    def __done__(self):
+        self.f.close()
+
+    def connection_made(self, transport):
+        self.transport = transport
+
+        print("Connected to RPD server!")
+        #transport.write(self.message.encode())
+
+    def data_received(self, data):
+        self.timeout_handle.cancel()
+        loop = asyncio.get_running_loop()
+        self.timeout_handle = loop.call_later(TIMEOUT, self._timeout,)
+
+        self.queue += data
+        
+        if self.state == EState.ES_WAIT_FOR_SIZE:
+            if len(self.queue) >= 4:
+                t = self.queue[:4]
+                self.queue = self.queue[4:]
+                self.sz = int(t, 0x10)
+                print("block size = {}".format(self.sz))
+                self.state = EState.ES_WAIT_FOR_DATA
+        else: # ES_WAIT_FOR_DATA
+            if len(self.queue) >= self.sz:
+                t = self.queue[:self.sz]
+                self.queue = self.queue[self.sz:]
+
+                self.recv_func(t)
+                self.state = EState.ES_WAIT_FOR_SIZE
+
+    def connection_lost(self, exc):
+        print('The server closed the connection\n')
+        self.on_con_lost.set_result(True)
+    
+    def _timeout(self):
+        print('Timeout!\n')
+        self.transport.close()
+
+async def main():
+    # Get a reference to the event loop as we plan to use
+    # low-level APIs.
+    message = 'vibro'
+
     while True:
-        socket_list = [s]
-        # Get the list sockets which are readable
-        read_sockets, write_sockets, error_sockets = select.select(
-            socket_list, [], [])
+        loop = asyncio.get_running_loop()
+        on_con_lost = loop.create_future()
 
-        for sock in read_sockets:
-            recv_func()
+        while True:
+            try:
+                coro = loop.create_connection(lambda: TcpClientProtocol(on_con_lost), host, port)
+                #coro = asyncio.ensure_future(coro)
+                transport, protocol = await asyncio.wait_for(coro, timeout=TIMEOUT)
 
-    s.close()
+            except (OSError, asyncio.exceptions.TimeoutError) as e:
+                print("Server not up retrying again...")
+            else:
+                break
+
+        # Wait until the protocol signals that the connection
+        # is lost and close the transport.
+
+        try:
+            await on_con_lost
+
+        finally:
+            transport.close()
+
+asyncio.run(main())
