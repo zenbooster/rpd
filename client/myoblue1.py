@@ -10,8 +10,7 @@ class ECompressMethod(IntEnum):
     ECM_NONE = 0
     ECM_LZ77 = auto()
 
-#s = serial.Serial('com5', 1000000, timeout=1)
-
+s = None
 while True:
     try:
         s = serial.Serial('com5', 1000000, timeout=1)
@@ -64,5 +63,5 @@ while True:
 
     except Exception as e:
         print('Exception: {}'.format(str(e)))
-        if s:
-            s = None
+        s = None
+        time.sleep(1)
