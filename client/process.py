@@ -8,51 +8,57 @@ import numpy as np
 import pandas as pd
 import time
 
-SAMPLE_RATE=2000
+#SAMPLE_RATE=2000
+SAMPLE_RATE=500
 RESAMPLE_RATE = 500
 
 matplotlib.use('Qt5Agg')
 
-with open('out.dat', 'rb') as f:
-    #d = f.read(16)
-    #if d:
-    if True:
-        for i in range(1):
+with open('2021-10-02-23-43-50.myoblue.rpd', 'rb') as f:
+    d = f.read(16)
+    if d:
+    #if True:
+        for i in range(39):
         #i = 0
         #while True:
-            print('epoche#{}'.format(i))
-            d = f.read(300*SAMPLE_RATE*2)
+            d = f.read(30*SAMPLE_RATE*2)
             if not d:
                 break
-            #d = f.read()
-            d = d[16:]
+            
+            if i < 28:
+                continue
+                
+            print('epoche#{}'.format(i))
+
             fmt = '<{}H'.format(len(d) // 2)
             t = unpack(fmt, d)
             d = list(t)
             d = np.array(d)
             d = signal_resample(d, sampling_rate=SAMPLE_RATE, desired_sampling_rate=RESAMPLE_RATE)
-            d = d / (np.amax(d)*2)
+            d = d / (1 << 14)#(np.amax(d)*2)
         
             print(len(d))
             df=pd.DataFrame({'signal': d, 'id': [x*2 for x in range(len(d))]})
             df = df.set_index('id')
+            '''
             nk.signal_plot(df)
             fig = plt.gcf()
             fig.savefig("process1.png", dpi=300)
+            '''
             
             d = df.signal
-            #d = nk.signal_sanitize(d)
-            #d = nk.emg_clean(d, sampling_rate=RESAMPLE_RATE)
-            d = nk.signal_filter(d, lowcut=40, highcut=61, method='butterworth', order=2)
-
+            d = nk.signal_filter(d, lowcut=12, highcut=40, method='butterworth', order=2)
+            '''
             df=pd.DataFrame({'signal': d, 'id': [x*2 for x in range(len(d))]})
             df = df.set_index('id')            
             nk.signal_plot(df)
             fig = plt.gcf()
             fig.savefig("process2.png", dpi=300)
+            '''
 
-            pw = nk.signal_power(d, frequency_band=[(5, 100)])
-            print('pw={}'.format(pw))
+            #mean = np.mean(d)
+            var = np.var(d)
+            print('var={}'.format(var))
             #d = nk.signal_sanitize(df.signal)
             #d = nk.emg_clean(d, sampling_rate=RESAMPLE_RATE)
             #amp = nk.emg_amplitude(d)
