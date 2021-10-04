@@ -3,7 +3,7 @@ from struct import unpack
 import numpy as np
 import pandas as pd
 import scipy
-from scipy.signal import butter, sosfiltfilt
+from scipy.signal import butter, sosfiltfilt, find_peaks
 import time
 
 def butter_bandpass_filter(data, lowcut, highcut, fs, order=2):
@@ -12,7 +12,17 @@ def butter_bandpass_filter(data, lowcut, highcut, fs, order=2):
     sos = butter(order, [low, high], btype='bandpass', output="sos", fs=fs)
     y = sosfiltfilt(sos, data)
     return y
-    
+
+def remove_peaks(d, h):
+    while(True):
+        p, _ = find_peaks(d, height=h)
+        #print(p)
+        if(not len(p)):
+            break
+        
+        for v in p:
+            d[v] = h * 0.75
+
 #SAMPLE_RATE=2000
 SAMPLE_RATE=500
 RESAMPLE_RATE = 500
@@ -91,21 +101,31 @@ with open('2021-10-02-23-43-50.myoblue.rpd', 'rb') as f:
             for k in range(10, 0, -1):
                 if ftsize > 2*N*k:
                     for k, v in features.items():
+                        print('{}:'.format(k))
+                        rf = v
                         sf = sfeatures[k]
                         Xmin = np.array(sf[:N]).mean()
                         Xmax = np.array(sf[-N:]).mean()
 
                         nf = []                    
                         divider = Xmax - Xmin
-                        for v in v:
+                        for v in rf:
                             nf.append((v - Xmin) / divider)
 
                         # вычисляем пороги:
                         # фильтруем фишки вычисляя скользящие средние:
-                        N = 4
+                        N = 15
                         nff = np.convolve(nf, np.ones(N)/N, mode='valid')
-                        # ищем пики:
-                        print(nff)
+                        mean = nff.mean()
+                        var = nff.var()
+                        # ищем и удаляем пики превышающие mean и var:
+                        remove_peaks(nff, mean)
+                        remove_peaks(nff, var)
+                        # оставшиеся пики:
+                        peaks_m, _ = find_peaks(nff, height=0)
+                        peaks_v, _ = find_peaks(nff, height=0)
+                        print(peaks_m)
+                        print(peaks_v)
 
                     break
 
