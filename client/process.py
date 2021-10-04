@@ -21,7 +21,7 @@ def remove_peaks(d, h):
             break
         
         for v in p:
-            d[v] = h * 0.75
+            d[v] = h * 0.99
 
 #SAMPLE_RATE=2000
 SAMPLE_RATE=500
@@ -114,7 +114,7 @@ with open('2021-10-02-23-43-50.myoblue.rpd', 'rb') as f:
 
                         # вычисляем пороги:
                         # фильтруем фишки вычисляя скользящие средние:
-                        N = 15
+                        N = 20
                         nff = np.convolve(nf, np.ones(N)/N, mode='valid')
                         mean = nff.mean()
                         var = nff.var()
@@ -123,9 +123,21 @@ with open('2021-10-02-23-43-50.myoblue.rpd', 'rb') as f:
                         remove_peaks(nff, var)
                         # оставшиеся пики:
                         peaks_m, _ = find_peaks(nff, height=0)
+                        if len(peaks_m):
+                            mp_m = np.array([nff[v] for v in peaks_m]).mean()
+                            st_m = 4 * mp_m
+                            wt_m = mp_m
+                            print(f'st_m: {st_m}; wt_m: {wt_m}')
+                        
                         peaks_v, _ = find_peaks(nff, height=0)
-                        print(peaks_m)
-                        print(peaks_v)
+                        if len(peaks_v):
+                            mp_v = np.array([nff[v] for v in peaks_v]).mean()
+                            st_v = 4 * mp_v
+                            wt_v = mp_v
+                            print(f'st_v: {st_v}; wt_v: {wt_v}')
+
+                        #print(peaks_m)
+                        #print(peaks_v)
 
                     break
 
