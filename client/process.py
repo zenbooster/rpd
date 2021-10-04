@@ -5,6 +5,7 @@ import pandas as pd
 import scipy
 from scipy.signal import butter, sosfiltfilt, find_peaks
 import time
+import math
 
 def butter_bandpass_filter(data, lowcut, highcut, fs, order=2):
     low = lowcut
@@ -14,6 +15,7 @@ def butter_bandpass_filter(data, lowcut, highcut, fs, order=2):
     return y
 
 def remove_peaks(d, h):
+    '''
     while(True):
         p, _ = find_peaks(d, height=h)
         #print(p)
@@ -22,6 +24,11 @@ def remove_peaks(d, h):
         
         for v in p:
             d[v] = h * 0.99
+      '''      
+    #
+    d = np.clip(d, -h, h)
+    
+    return d
 
 #SAMPLE_RATE=2000
 SAMPLE_RATE=500
@@ -42,10 +49,10 @@ sfeatures = {
 }
 ftsize = 0
 
-with open('2021-10-02-23-43-50.myoblue.rpd', 'rb') as f:
-    d = f.read(16)
-    if d:
-    #if True:
+with open('out.dat', 'rb') as f:
+    #d = f.read(16)
+    #if d:
+    if True:
         for i in range(150):
         #i = 0
         #while True:
@@ -114,13 +121,14 @@ with open('2021-10-02-23-43-50.myoblue.rpd', 'rb') as f:
 
                         # вычисляем пороги:
                         # фильтруем фишки вычисляя скользящие средние:
-                        N = 20
-                        nff = np.convolve(nf, np.ones(N)/N, mode='valid')
+                        NC = 10
+                        nff = np.convolve(nf, np.ones(NC)/NC, mode='valid')
                         mean = nff.mean()
-                        var = nff.var()
+                        std = math.sqrt(nff.var())
+                        #std = nff.var()
                         # ищем и удаляем пики превышающие mean и var:
-                        remove_peaks(nff, mean)
-                        remove_peaks(nff, var)
+                        nff = remove_peaks(nff, mean)
+                        nff = remove_peaks(nff, std)
                         # оставшиеся пики:
                         peaks_m, _ = find_peaks(nff, height=0)
                         if len(peaks_m):
@@ -136,9 +144,21 @@ with open('2021-10-02-23-43-50.myoblue.rpd', 'rb') as f:
                             wt_v = mp_v
                             print(f'st_v: {st_v}; wt_v: {wt_v}')
 
-                        #print(peaks_m)
-                        #print(peaks_v)
+                        print(peaks_m)
+                        print(peaks_v)
+                        
+                        t = []
+                        for v in nf:
+                        	if v > st_v:
+                        		t.append((v, 's'))
+                        	else:
+                        		if v > wt_v:
+                        			t.append((v, 'w'))
+                        		else:
+                        			t.append((v, 'n'))
 
+                        print(t)
+						
                     break
 
             #i+= 1
