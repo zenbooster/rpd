@@ -109,14 +109,8 @@ def decompress(src):
 
     return out
 
-def unp_on_produce(v):
-    global buffer
-    buffer += bytes([v & 0xff, v >> 8])
-
 host = "192.168.1.131"
 port = 23
-#unp = Unpack12bit()
-#unp.onProduce(unp_on_produce)
 
 TIMEOUT = 2
 
@@ -131,6 +125,7 @@ class TcpClientProtocol(asyncio.Protocol):
         fmt = '<LLHBBL'
         sig, utc_time, ver, compress_method, bits_per_sample, sample_rate = unpack(fmt, d)
         d = pack(fmt, sig, utc_time, ver, ECompressMethod.ECM_NONE, bits_per_sample, sample_rate)
+        #d = pack(fmt, sig, utc_time, ver, ECompressMethod.ECM_NONE, 16, sample_rate)
 
         self.f.write(d)
         if sig != 0x445052:
@@ -167,9 +162,8 @@ class TcpClientProtocol(asyncio.Protocol):
 
     def recv_block(self, data):
         d = base64.b64decode(data)
-        sz = len(d)
-        d = decompress(d)
 
+        d = decompress(d)
         '''
         state = 0
         v16 = 0
@@ -178,13 +172,17 @@ class TcpClientProtocol(asyncio.Protocol):
                 v16 = b
             else:
                 v16 = v16 | (b << 8)
-                unp.push(v16)
+                self.unp.push(v16)
             
             state = (state + 1) & 1
         
-        f.write(buffer)
+        self.f.write(self.buffer)
+        self.buffer = bytes()
         '''
         self.f.write(d)
+
+    def unp_on_produce(self, v):
+        self.buffer += bytes([v & 0xff, v >> 8])
 
     def __init__(self, on_con_lost):
         # это надо бы налету проверять и делать, но пока хоть так...
@@ -206,6 +204,10 @@ class TcpClientProtocol(asyncio.Protocol):
 
         loop = asyncio.get_running_loop()
         self.timeout_handle = loop.call_later(TIMEOUT, self._timeout,)
+
+        self.buffer = bytes()
+        self.unp = Unpack12bit()
+        self.unp.onProduce(self.unp_on_produce)
     
     def __done__(self):
         self.f.close()

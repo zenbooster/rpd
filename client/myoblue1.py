@@ -13,11 +13,15 @@ class ECompressMethod(IntEnum):
 s = None
 while True:
     try:
-        s = serial.Serial('com5', 1000000, timeout=1)
+        s = serial.Serial('com4', 9600, timeout=1)
+        #print(f's.in_waiting={s.in_waiting}')
         block = s.read(246)
         if not block:
             print('timeout')
             continue
+
+        #length = len(block)
+        #print(f'len(block={length})')
 
         utc_time = int(time.time())
         utc = datetime.utcfromtimestamp(utc_time).strftime('%Y-%m-%d %H:%M:%S')
@@ -29,6 +33,7 @@ while True:
         name += '.myoblue.rpd'
 
         with open(name, 'wb') as f:
+            '''
             fmt = '<LLHBBL'
             sig = 0x445052
             ver = 0x0100
@@ -36,8 +41,10 @@ while True:
             sample_rate = 500
             hdr = pack(fmt, sig, utc_time, ver, ECompressMethod.ECM_NONE, bits_per_sample, sample_rate)
             f.write(hdr)
+            '''
 
             while True:
+                '''
                 sig = block[:2]
                 if sig != b'\xff\xff':
                     raise Exception('Invalid signature!')
@@ -52,6 +59,11 @@ while True:
                 print('battery charge = {}'.format(vdd))
                 
                 block = block[8:] # оставляем только данные
+                '''
+                
+                if b'\x00 ' * ((246-8)//2) in block:
+                    print('HIT')
+                
                 f.write(block)
                 
                 block = s.read(246)
