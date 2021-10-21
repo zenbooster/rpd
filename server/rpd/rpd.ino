@@ -27,9 +27,9 @@
 //#include <lwip/ip4_addr.h>
 //#include <lwip/inet.h>
 
-#define channel ADC1_CHANNEL_7
-#define pin ADC1_CHANNEL_7_GPIO_NUM
-#define ar_pin A7
+#define channel ADC1_CHANNEL_6
+#define pin ADC1_CHANNEL_6_GPIO_NUM
+//#define ar_pin A7
 
 #define DEFAULT_VREF 1100
 
@@ -41,10 +41,12 @@
 
 //const byte DNS_PORT = 53;
 
-#define SAMPLE_RATE 2000 // (SAMPLE_RATE * 12) / 16 должно являться целым числом.
+#define SAMPLE_RATE 2000
 #if (SAMPLE_RATE * 12) & 0x0f
 #   error "The data will not fit into the buffer entirely."
 #endif
+
+#define BUFFER_SIZE SAMPLE_RATE*1
 
 const int LED_BUILTIN = 2;
 
@@ -61,10 +63,10 @@ WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP);
 unsigned long epoch_time;
 
-DoubleBuffer dbuf(SAMPLE_RATE);
-unsigned short packed_buffer[(SAMPLE_RATE * 12) / 16];
+DoubleBuffer dbuf(BUFFER_SIZE);
+unsigned short packed_buffer[(BUFFER_SIZE * 12) / 16];
 unsigned short *packed_buffer_ptr = packed_buffer;
-uint8_t compressed_buffer[SAMPLE_RATE * sizeof(unsigned short)]; // ставим размер больше, на случай, если данные не сожмутся...
+uint8_t compressed_buffer[BUFFER_SIZE * sizeof(unsigned short)]; // ставим размер больше, на случай, если данные не сожмутся...
 Pack12bit packer;
 String sb64buffer;
 
@@ -201,10 +203,11 @@ void setup()
   Serial.begin(115200);
 
   // инициализация вибромотора:
-  HMD.begin(SDA_VIBE, SCL_VIBE);
+  /*HMD.begin(SDA_VIBE, SCL_VIBE);
   HMD.Mode(0); // Internal trigger input mode -- Must use the GO() function to trigger playback.
   HMD.MotorSelect(0x36); // ERM motor, 4x Braking, Medium loop gain, 1.365x back EMF gain
   HMD.Library(2); //1-5 & 7 for ERM motors, 6 for LRA motors 
+  */
 
   //HMD.Waveform(0, 83);
   //HMD.go();
@@ -253,6 +256,11 @@ void setup()
 
   dbuf.onFillingComplete([](unsigned short *pbuf) {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+
+    if(uxSemaphoreGetCount(xSendSemaphore))
+    {
+      Serial.println("ERROR: Didn't have time to process the buffer.");
+    }
     xSemaphoreGiveFromISR(xSendSemaphore, &xHigherPriorityTaskWoken);
   });
 

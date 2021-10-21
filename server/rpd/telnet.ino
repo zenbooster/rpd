@@ -32,17 +32,20 @@ void TelnetSendTask(void *pvParameter)
 
     unsigned short *p = dbuf.get_pemg_buffer_old();
     packer.reset();
-    for(int i = 0; i < SAMPLE_RATE; i++)
+    for(int i = 0; i < BUFFER_SIZE; i++)
     {
       packer.push(*p++);
     }
     packed_buffer_ptr = packed_buffer;
 
     
-    int sz = LZ_Compress((unsigned char *)packed_buffer, compressed_buffer, ((SAMPLE_RATE * 12) / 16) * sizeof(unsigned short));
+    int sz = LZ_Compress((unsigned char *)packed_buffer, compressed_buffer, ((BUFFER_SIZE * 12) / 16) * sizeof(unsigned short));
+    //int sz = LZ_Compress((unsigned char *)p, compressed_buffer, SAMPLE_RATE * sizeof(unsigned short));
 
     //int sz = ((SAMPLE_RATE * 12) / 16) * sizeof(unsigned short);
+    //int sz = SAMPLE_RATE * sizeof(unsigned short);
     //memcpy(compressed_buffer, (unsigned char *)packed_buffer, sz);
+    //memcpy(compressed_buffer, (unsigned char *)p, sz);
     sb64buffer = base64::encode(compressed_buffer, sz);
 
     char sSize[5];
@@ -51,16 +54,9 @@ void TelnetSendTask(void *pvParameter)
     telnet.print(sb64buffer);
 
     digitalWrite(LED_BUILTIN, LOW);
+    //xSemaphoreGive(xSendCompleteSemaphore);
   } // for(;;)
 }
-
-/*void onTelnetDisconnect(String ip)
-{
-    timer_pause(TIMER_GROUP_0, TIMER_0);
-    Serial.print("- Telnet: ");
-    Serial.print(ip);
-    Serial.println(" disconnected");
-}*/
 
 void TelnetTask(void *pvParameter)
 {
@@ -116,7 +112,7 @@ void TelnetTask(void *pvParameter)
   //telnet.onDisconnect(onTelnetDisconnect);
   
   // passing a lambda function
-  telnet.onInputReceived([](String str) {
+  /*telnet.onInputReceived([](String str) {
     // checks for a certain command
     if (str == "vibro")
     {
@@ -124,7 +120,7 @@ void TelnetTask(void *pvParameter)
       HMD.go();
       fprintf(stdout, "telnet: vibro requested\n");
     }
-  });
+  });*/
 
   Serial.print("telnet: ");
   int res = telnet.begin();
@@ -134,7 +130,7 @@ void TelnetTask(void *pvParameter)
     for (;;)
     {
       telnet.loop();
-      //vTaskDelay(10);
+      //vTaskDelay(50);
       vTaskDelay(100);
     } // for (;;)
   }
