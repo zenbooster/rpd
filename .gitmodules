@@ -1,0 +1,3 @@
+[submodule "server/SimpleBluetoothLeTerminal"]
+	path = server/SimpleBluetoothLeTerminal
+	url = https://github.com/zenbooster/SimpleBluetoothLeTerminal.git
