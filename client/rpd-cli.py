@@ -7,9 +7,10 @@ import asyncio
 import base64
 from struct import *
 from datetime import datetime
+from time import time
 from enum import IntEnum, auto, unique
 
-MAX_RPD_FILES_DATA_SIZE = 1024*1024*1024*1 # 1G
+MAX_RAW_FILES_DATA_SIZE = 1024*1024*1024*1 # 1G
 
 @unique
 class ECompressMethod(IntEnum):
@@ -21,7 +22,7 @@ class EState(IntEnum):
     ES_WAIT_FOR_SIZE = auto()
     ES_WAIT_FOR_DATA = auto()
 
-host = "192.168.1.129"
+host = "192.168.4.30"
 port = 3827
 
 TIMEOUT = 2
@@ -29,38 +30,27 @@ TIMEOUT = 2
 class TcpClientProtocol(asyncio.Protocol):
     def recv_block(self, data):
         d = base64.b64decode(data)
-
-        #d = decompress(d)
-        '''
-        state = 0
-        v16 = 0
-        for b in d:
-            if state == 0:
-                v16 = b
-            else:
-                v16 = v16 | (b << 8)
-                self.unp.push(v16)
-            
-            state = (state + 1) & 1
-        
-        self.f.write(self.buffer)
-        self.buffer = bytes()
-        '''
         self.f.write(d)
-
-    #def unp_on_produce(self, v):
-    #    self.buffer += bytes([v & 0xff, v >> 8])
 
     def __init__(self, on_con_lost):
         # это надо бы налету проверять и делать, но пока хоть так...
         filesizes = sum(os.path.getsize(f) for f in os.listdir() if (os.path.isfile(f) and f.endswith('.raw')))
-        print("Total .rpd files data size = {}".format(filesizes))
-        if filesizes >= MAX_RPD_FILES_DATA_SIZE:
+        print("Total .raw files data size = {}".format(filesizes))
+        if filesizes >= MAX_RAW_FILES_DATA_SIZE:
             oldest_file = min([os.path.abspath(f) for f in os.listdir() if f.endswith('.raw')], key=os.path.getctime)
             print('remove oldest_file: {}'.format(oldest_file))
             os.remove(oldest_file)
     
-        self.fname = "data.raw"
+        #self.fname = "data.raw"
+        utc_time = time()
+        utc = datetime.utcfromtimestamp(utc_time).strftime('%Y-%m-%d %H:%M:%S')
+        print("Stream started at {} (UTC)".format(utc))
+        name = utc
+        name = name.replace(' ', '-')
+        name = name.replace(':', '-')
+        name += '.raw'
+        self.fname = name
+                
         self.f = open(self.fname, "wb")
         self.transport = None
         self.on_con_lost = on_con_lost
@@ -93,12 +83,9 @@ class TcpClientProtocol(asyncio.Protocol):
         self.queue += data
         
         if self.state == EState.ES_WAIT_FOR_SIZE:
-#            if len(self.queue) >= 4:
-#                t = self.queue[:4]
-#                self.queue = self.queue[4:]
-            if len(self.queue) >= 2:
-                t = self.queue[:2]
-                self.queue = self.queue[2:]
+            if len(self.queue) >= 4:
+                t = self.queue[:4]
+                self.queue = self.queue[4:]
                 self.sz = int(t, 0x10)
                 print("block size = {}".format(self.sz))
                 self.state = EState.ES_WAIT_FOR_DATA
